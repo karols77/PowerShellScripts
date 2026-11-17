@@ -45,7 +45,7 @@ if ((-not (test-path $($args[0]) -pathtype Container)) -or ($args.Count -eq 0)) 
 #Pliki w katalogu głównym
 $totalsize = 0;
 $size = (Get-ChildItem $($args[0]) -file | Measure-Object -property length -sum).Sum;
-write-host "Size of $($args[0]) -> $(Format-Size -size $size) MB";
+write-host "Size of $($args[0]) -> $(Format-Size -size $size)";
 $totalsize += $size;
 
 #Pobranie zajętości katalogów
