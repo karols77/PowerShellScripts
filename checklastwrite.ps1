@@ -1,4 +1,4 @@
-#Program do analizy ostatnio zapisanych plików
+#Program do wyszukiwania ostatnio zapisanych plików
 #Analiza argumentów
 function Get-Args {
     param(
@@ -71,11 +71,27 @@ function Get-Args {
                 continue;
             }
             "-owner" {
-                if($script:downer) {
+                if ($script:downer) {
                     Write-Host("You can use -owner parameter one time");
                     exit 1;
                 }
                 $script:downer = $true;
+            }
+            "-outfile" {
+                $i++;
+                if (($i -ge $params.Count) -or ($script:dfile -ne "")) {
+                    Write-Host "You can use -outfile one time or there is no file name as argument";
+                    exit 1;
+                }
+                $script:dfile = $($params[$i]);
+            }
+            "-ownername" {
+                $i++;
+                if (($i -ge $params.Count) -or ($script:downername -ne "")) {
+                    Write-Host "You can use -ownername one time or there is no file name as argument";
+                    exit 1;
+                }
+                $script:downername = $($params[$i]);
             }
             default {
                 Write-Host "Wrong parameter: $_";
@@ -88,8 +104,71 @@ function Get-Args {
         Write-Host "Not -path and (-day nor -hour nor -minute arguments)";
         return $false;
     }
+    if ($script:downername -ne "") {
+        $script:downer = $true;
+    }
+    return $true;
+}
+
+function Get-FileListByDate {
+    param (
+        [string]$path,
+        [datetime]$date
+    )
+    $files = Get-ChildItem $path -file -recurse;
+    [System.IO.FileInfo[]]$dfile = $null;
+    foreach ($file in $files) {
+        if ($file.LastWriteTime -ge $script:ddate) {
+            $dfile += $file;
+        }
+    }
+    $dfile = $dfile | Sort-Object LastWriteTime -Descending;
+    return $dfile;
+}
+
+function Select-Owner {
+    param (
+        [System.IO.FileInfo[]]$files,
+        [string]$ownername
+    )
+    $nfiles = @();
+    foreach ($file in $files) {
+        $snfile = [PSCustomObject]@{
+            FullName      = $file.FullName
+            LastWriteTime = $file.LastWriteTime
+            Length        = $file.Length
+            Owner         = (Get-Acl $file.FullName).Owner
+        };
+        if (($ownername -eq "") -or ($snfile.Owner -like $ownername)) {
+            $nfiles += $snfile;
+        }
+    }
+    return $nfiles;
+}
+
+function Format-FileList {
+    param (
+        [System.IO.FileInfo[]]$files,
+        [bool]$owner,
+        [string]$ownername,
+        [string]$outfile
+    )
+    if ($owner) {
+        $nfiles = Select-Owner -files $files -ownername $ownername;
+        if ($outfile -ne "") {
+                $nfiles | Select-Object FullName, LastWriteTime, Length, Owner | Format-Table -AutoSize | Out-File $outfile;
+        }
+        else {
+            $nfiles | Select-Object FullName, LastWriteTime, Length, Owner | Format-Table -AutoSize;
+        }
+    }
     else {
-        return $true;
+        if ($outfile -ne "") {
+            $files | Select-Object FullName, LastWriteTime, Length | Format-Table -AutoSize | Out-File $outfile;
+        }
+        else {
+            $files | Select-Object FullName, LastWriteTime, Length | Format-Table -AutoSize;
+        }
     }
 }
 
@@ -97,10 +176,22 @@ function Get-Args {
 $script:ddate = (Get-Date);
 $script:dpath = "";
 $script:downer = $false;
+$script:dfile = "";
+$script:downername = "";
 if (-not(Get-Args -params $args)) {
     Write-Host "Error: Wrong parameters";
     exit 1;
 }
 Write-Host "Selected limit past time: $($script:ddate.ToString("F"))";
 Write-Host "Get owner of files: $script:downer";
+if ($script:dfile -ne "") {
+    Write-Host "Out-File:" $script:dfile;
+}
+if ($script:downername -ne "") {
+    Write-Output "Owner: $script:downername";
+}
+
+#Wyświetlenie wyników
+$files = Get-FileListByDate -path $script:dpath -date $script:ddate;
+Format-FileList -files $files -owner $script:downer -ownername $script:downername -outfile $script:dfile;
 exit 0;
