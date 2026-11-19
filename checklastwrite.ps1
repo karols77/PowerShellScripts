@@ -101,7 +101,7 @@ function Get-Args {
         }
     }
     if (-not ($dateOK -and $pathOK)) {
-        Write-Host "Not -path and (-day nor -hour nor -minute arguments)";
+        Write-Host "Not -path and (-days nor -hours nor -minutes nor -seconds arguments)";
         return $false;
     }
     if ($script:downername -ne "") {
